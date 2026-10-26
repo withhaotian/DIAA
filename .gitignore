@@ -1,0 +1,16 @@
+# Downloaded model weights (the two small DIAA lookup tables are release assets)
+*.bin
+*.pt
+*.pth
+
+# Generated outputs and local environments
+outputs/
+.venv/
+venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.DS_Store
+
+server_sync.sh

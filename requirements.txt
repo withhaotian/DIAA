@@ -1,0 +1,10 @@
+# Install a CUDA-enabled PyTorch build appropriate for your NVIDIA device first.
+torch==2.7.0
+transformers==4.51.3
+accelerate==1.7.0
+fschat==0.2.36
+numpy>=1.24,<3
+safetensors>=0.4.3
+tqdm>=4.66
+datasets==3.6.0
+gptqmodel==4.0.0

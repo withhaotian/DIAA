@@ -1,0 +1,163 @@
+import argparse
+from fastchat.utils import str_to_torch_dtype
+
+from evaluation.eval_chat import run_eval, reorg_answer_file
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+@torch.inference_mode()
+def baseline_forward(input_ids, model, tokenizer, max_new_tokens, temperature=0.0, do_sample=False):
+    if tokenizer.pad_token_id is None:
+        attention_mask = torch.ones_like(input_ids, dtype=torch.long)
+    else:
+        attention_mask = (input_ids != tokenizer.pad_token_id).long()
+
+    output_ids = model.generate(
+        input_ids,
+        attention_mask=attention_mask,
+        num_beams=1,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=1.0,
+        max_new_tokens=max_new_tokens,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+    new_token = len(output_ids[0][len(input_ids[0]):])
+    step = new_token
+    accept_length_list = [1] * new_token
+    draft_token_num = new_token
+    
+    return output_ids, new_token, step, accept_length_list, draft_token_num
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        required=True,
+    )
+    parser.add_argument("--model-id", type=str, required=True)
+    parser.add_argument("--answer-file", type=str, help="The output answer file.")
+    parser.add_argument(
+        "--bench-name",
+        type=str,
+        default="eagle",
+        help="The name of the benchmark question set.",
+    )
+    parser.add_argument(
+        "--question-begin",
+        type=int,
+        help="A debug option. The begin index of questions.",
+    )
+    parser.add_argument(
+        "--question-end",
+        type=int,
+        help="A debug option. The end index of questions."
+    )
+    parser.add_argument(
+        "--max-new-tokens",
+        type=int,
+        default=512,
+        help="The maximum number of new generated tokens.",
+    )
+    parser.add_argument(
+        "--max-output-length",
+        type=int,
+        default=2048,
+        help="The maximum number of context tokens.",
+    )
+    parser.add_argument(
+        "--num-gpus-per-model",
+        type=int,
+        default=1,
+        help="The number of GPUs per model.",
+    )
+    parser.add_argument(
+        "--num-gpus-total", type=int, default=1, help="The total number of GPUs."
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="The temperature for medusa sampling.",
+    )
+    parser.add_argument(
+        "--dtype",
+        type=str,
+        default="float16",
+        choices=["float32", "float64", "float16", "bfloat16"],
+        help="Override the default dtype. If not set, it will use float16 on GPU.",
+    )
+    parser.add_argument(
+        "--task-name",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--data-num",
+        type=int,
+        default=10,
+        help="The number of samples.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="The sampling seed.",
+    )
+    parser.add_argument(
+        "--timestamp",
+        type=str,
+        default=None,
+        help="The timestamp of the run.",
+    )
+
+    args = parser.parse_args()
+
+    args.model_name = (args.model_id + "-vanilla-" + str(args.dtype)+ "-temp-" + str(args.temperature)
+                       + "-seed-" + str(args.seed)) + "-max_new_tokens-" + str(args.max_new_tokens)
+    
+    answer_file = f"outputs/{args.bench_name}/{args.task_name}_{args.data_num}/model_answer/{args.model_id}/{args.timestamp}/{args.model_name}.jsonl"
+
+    question_file = f"data/{args.bench_name}/{args.task_name}/question.jsonl"
+
+    print(f"Output to {answer_file}")
+    
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_path,
+        torch_dtype=str_to_torch_dtype(args.dtype),
+        low_cpu_mem_usage=True,
+        device_map="cuda:0"
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+
+    if args.temperature > 0:
+        do_sample = True
+    else:
+        do_sample = False
+
+    run_eval(
+        model=model,
+        tokenizer=tokenizer,
+        forward_func=baseline_forward,
+        model_id=args.model_id,
+        question_file=question_file,
+        question_begin=args.question_begin,
+        question_end=args.question_end,
+        answer_file=answer_file,
+        max_new_tokens=args.max_new_tokens,
+        num_gpus_per_model=args.num_gpus_per_model,
+        num_gpus_total=args.num_gpus_total,
+        task_name=args.task_name,
+        data_num=args.data_num,
+        seed=args.seed,
+        temperature=args.temperature,
+        do_sample=do_sample,
+        max_output_length=args.max_output_length,
+    )
+
+    # reorg_answer_file(answer_file)
