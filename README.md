@@ -30,6 +30,17 @@ model/diaa/offline/cache/lut_cache_vicuna-7b-v1.5_topk.safetensors
 
 The LUT must match the model vocabulary and tokenizer. The default evaluation path supports greedy decoding, batch size one, and a single device.
 
+## Platform (Reported in the Paper)
+
+| Component | Specification |
+|---|---|
+| Device | NVIDIA Jetson Orin Nano Super |
+| Memory | 8 GB Unified RAM |
+| Storage | 256 GB SSD |
+| GPU | 1,024-core GPU, 67 TOPS |
+| JetPack | v6.2 |
+| CUDA | v12.6 |
+
 ## Citation
 
 ```bibtex
